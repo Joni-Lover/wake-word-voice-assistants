@@ -100,9 +100,26 @@ jobs:
             fi
 
             mkdir -p "pages/${device}"
+
+            # Copy firmware binaries to GitHub Pages so they are served with CORS headers.
+            # Firmware hosted on GitHub Releases redirects via github.com to
+            # objects.githubusercontent.com which may not include CORS headers,
+            # causing "Failed to fetch" errors in esp-web-tools when installing.
+            bin_files=("${version_dir}"/*.bin)
+            if [ ${#bin_files[@]} -eq 0 ]; then
+              echo "No .bin files found for device directory: ${device_raw}"
+              exit 1
+            fi
+            for bin_file in "${bin_files[@]}"; do
+              cp "$bin_file" "pages/${device}/"
+            done
+
+            # Rewrite manifest: parts use relative paths (served from GitHub Pages,
+            # CORS-safe), OTA path uses absolute GitHub Releases URL (used by the
+            # ESPHome update component for over-the-air updates, not for initial flash).
             if jq --exit-status --arg base "$base_url" '
               .builds |= map(
-                (if has("parts") then .parts |= map(.path = ($base + "/" + (.path | ltrimstr("./")))) else . end)
+                (if has("parts") then .parts |= map(.path = (.path | ltrimstr("./"))) else . end)
                 | if has("ota") then .ota.path = ($base + "/" + (.ota.path | ltrimstr("./"))) else . end
               )
             ' "$manifest" > "pages/${device}/manifest.json"; then
