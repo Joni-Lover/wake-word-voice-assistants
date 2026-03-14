@@ -81,13 +81,6 @@ jobs:
           repo="${{ github.repository }}"
           base_url="https://github.com/${repo}/releases/download/${version}"
           device_dirs=(files/*/"$version"/)
-          supported_devices=(
-            esp32-s3-box-3
-            m5stack-atom-echo
-            # Disabled for now:
-            # esp32-s3-box
-            # esp32-s3-box-lite
-          )
           processed_devices=0
 
           if [ ${#device_dirs[@]} -eq 0 ]; then
@@ -100,11 +93,6 @@ jobs:
             device_raw=$(basename "$device_dir")
             device="${device_raw%.factory}"
             manifest="$version_dir/manifest.json"
-
-            if [[ ! " ${supported_devices[*]} " =~ " ${device} " ]]; then
-              echo "Skipping unsupported device: ${device_raw}"
-              continue
-            fi
 
             if [ ! -f "$manifest" ]; then
               echo "No manifest.json found for device directory: ${device_raw}"
@@ -215,10 +203,6 @@ jobs:
             device_dir=$(dirname "$version_dir")
             device_raw=$(basename "$device_dir")
             device="${device_raw%.factory}"
-
-            if [[ ! " ${supported_devices[*]} " =~ " ${device} " ]]; then
-              continue
-            fi
 
             cat >> pages/index.html <<EOF
                 <li>
