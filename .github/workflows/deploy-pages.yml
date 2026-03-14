@@ -1,0 +1,245 @@
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: >-
+          Release tag to deploy (leave empty to use the latest
+          non-prerelease release)
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    env:
+      ESP_WEB_TOOLS_VERSION: "10.2.1"
+      ESP_WEB_TOOLS_INTEGRITY: "sha384-2Ea4WL8tjFb0qQKUqBoX45KlPVoUgL+Z3zUqsD0MHmtJ3faDbfNyZulLg/LfYDUZ"
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Resolve release tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.release-tag }}"
+          if [ -z "$tag" ]; then
+            tag=$(gh api "/repos/${{ github.repository }}/releases" \
+              --jq '[.[] | select(.prerelease==false and .draft==false)][0].tag_name')
+          fi
+          if [ -z "$tag" ] || [ "$tag" = "null" ]; then
+            echo "No non-prerelease release found."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Find successful build run for release
+        id: build-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.release.outputs.tag }}"
+          run_id=$(gh api "/repos/${{ github.repository }}/actions/workflows/build.yml/runs" \
+            -f event=release -f status=success \
+            --jq ".workflow_runs[] | select(.head_branch==\"${tag}\") | .id" \
+            | head -1)
+          if [ -z "$run_id" ]; then
+            echo "No successful build workflow run found for release ${tag}."
+            exit 1
+          fi
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
+        with:
+          path: files
+          run-id: ${{ steps.build-run.outputs.run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pages content
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          mkdir -p pages
+          version="${{ steps.release.outputs.tag }}"
+          repo="${{ github.repository }}"
+          base_url="https://github.com/${repo}/releases/download/${version}"
+          device_dirs=(files/*/"$version"/)
+          processed_devices=0
+
+          if [ ${#device_dirs[@]} -eq 0 ]; then
+            echo "No device artifact directories found under files/*/${version}/"
+            exit 1
+          fi
+
+          for version_dir in "${device_dirs[@]}"; do
+            device_dir=$(dirname "$version_dir")
+            device_raw=$(basename "$device_dir")
+            device="${device_raw%.factory}"
+            manifest="$version_dir/manifest.json"
+
+            if [ ! -f "$manifest" ]; then
+              echo "No manifest.json found for device directory: ${device_raw}"
+              exit 1
+            fi
+
+            mkdir -p "pages/${device}"
+
+            # Copy firmware binaries to GitHub Pages so they are served with CORS headers.
+            # Firmware hosted on GitHub Releases redirects via github.com to
+            # objects.githubusercontent.com which may not include CORS headers,
+            # causing "Failed to fetch" errors in esp-web-tools when installing.
+            bin_files=("${version_dir}"/*.bin)
+            if [ ${#bin_files[@]} -eq 0 ]; then
+              echo "No .bin files found for device directory: ${device_raw}"
+              exit 1
+            fi
+            for bin_file in "${bin_files[@]}"; do
+              cp "$bin_file" "pages/${device}/"
+            done
+
+            # Rewrite manifest: parts use relative paths (served from GitHub Pages,
+            # CORS-safe), OTA path uses absolute GitHub Releases URL (used by the
+            # ESPHome update component for over-the-air updates, not for initial flash).
+            if jq --exit-status --arg base "$base_url" '
+              .builds |= map(
+                (if has("parts") then .parts |= map(.path = (.path | ltrimstr("./"))) else . end)
+                | if has("ota") then .ota.path = ($base + "/" + (.ota.path | ltrimstr("./"))) else . end
+              )
+            ' "$manifest" > "pages/${device}/manifest.json"; then
+              echo "Processed manifest for ${device_raw} -> pages/${device}"
+            else
+              echo "Failed to process manifest for ${device_raw} -> pages/${device}"
+              rm -f "pages/${device}/manifest.json"
+              exit 1
+            fi
+
+            processed_devices=$((processed_devices + 1))
+          done
+
+          if [ "$processed_devices" -eq 0 ]; then
+            echo "No supported device manifests found for GitHub Pages"
+            exit 1
+          fi
+
+          cat > pages/index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Wake Word Voice Assistants Firmware</title>
+            <script type="module" src="https://unpkg.com/esp-web-tools@${ESP_WEB_TOOLS_VERSION}/dist/web/install-button.js?module" integrity="${ESP_WEB_TOOLS_INTEGRITY}" crossorigin="anonymous"></script>
+            <style>
+              :root {
+                color-scheme: light;
+                font-family: "Segoe UI", system-ui, sans-serif;
+                background: #f5f7fb;
+                color: #18212f;
+              }
+              body {
+                margin: 0;
+                min-height: 100vh;
+                background: linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
+              }
+              main {
+                max-width: 760px;
+                margin: 0 auto;
+                padding: 48px 20px 64px;
+              }
+              h1 { margin: 0 0 12px; font-size: clamp(2rem, 4vw, 3rem); }
+              h2 { margin: 0 0 12px; font-size: 1.15rem; }
+              ol { line-height: 1.6; padding-left: 1.2rem; }
+              p { line-height: 1.6; }
+              .note { font-size: 0.9em; color: #556; }
+              ul {
+                padding: 0;
+                list-style: none;
+                display: grid;
+                gap: 16px;
+              }
+              li {
+                background: #ffffff;
+                border: 1px solid #d7e1ee;
+                border-radius: 14px;
+                padding: 20px 22px;
+                box-shadow: 0 8px 24px rgba(24, 33, 47, 0.06);
+              }
+              esp-web-install-button {
+                --esp-tools-button-color: #005fb8;
+                --esp-tools-button-text-color: #ffffff;
+                --esp-tools-button-border-radius: 8px;
+              }
+              esp-web-install-button[install-supported] {
+                display: inline-block;
+                margin-top: 8px;
+              }
+              esp-web-install-button[install-unsupported] {
+                display: block;
+                margin-top: 8px;
+                color: #a00;
+                font-size: 0.9em;
+              }
+              a { color: #005fb8; }
+              code {
+                font-family: Consolas, "Courier New", monospace;
+                font-size: 0.95em;
+              }
+            </style>
+          </head>
+          <body>
+            <main>
+              <h1>Wake Word Voice Assistants Firmware</h1>
+              <p>Release <code>${version}</code> &mdash; connect your device via USB and click <strong>Install</strong>.</p>
+              <p class="note">Requires Chrome or Edge with <a href="https://caniuse.com/web-serial" target="_blank" rel="noopener">Web Serial API</a>.</p>
+              <ol>
+                <li>Open this page in Chrome or Edge on a desktop computer.</li>
+                <li>Click <strong>Connect</strong> for your device and select the ESP USB port.</li>
+                <li>In the installer dialog, select <strong>Install</strong> and follow the prompts to configure Wi-Fi.</li>
+              </ol>
+              <ul>
+          EOF
+
+          for version_dir in "${device_dirs[@]}"; do
+            device_dir=$(dirname "$version_dir")
+            device_raw=$(basename "$device_dir")
+            device="${device_raw%.factory}"
+
+            cat >> pages/index.html <<EOF
+                <li>
+                  <h2>${device}</h2>
+                  <p class="note">Firmware manifest: <a href="./${device}/manifest.json">./${device}/manifest.json</a></p>
+                  <esp-web-install-button manifest="./${device}/manifest.json"></esp-web-install-button>
+                </li>
+          EOF
+          done
+
+          cat >> pages/index.html <<EOF
+              </ul>
+            </main>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3
+        with:
+          path: pages/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4
