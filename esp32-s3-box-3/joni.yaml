@@ -76,8 +76,6 @@ logger:
   hardware_uart: USB_SERIAL_JTAG
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
   ap:
   on_connect:
     - script.execute: draw_display
