@@ -896,11 +896,22 @@ lvgl:
     - id: thinking_page
       bg_color: 0xFFFFFF
       bg_opa: COVER
+      on_load:
+        - lvgl.animimg.start: thinking_animimg
+      on_unload:
+        - lvgl.animimg.stop: thinking_animimg
       widgets:
-        - image:
-            src: casita_thinking
+        - animimg:
+            id: thinking_animimg
+            src:
+              - casita_thinking
+            duration: 800ms
+            repeat_count: forever
+            auto_start: false
             x: 0
             y: 0
+            width: 320
+            height: 240
         - obj:
             x: 20
             y: 20
@@ -938,11 +949,22 @@ lvgl:
     - id: replying_page
       bg_color: 0xFFFFFF
       bg_opa: COVER
+      on_load:
+        - lvgl.animimg.start: replying_animimg
+      on_unload:
+        - lvgl.animimg.stop: replying_animimg
       widgets:
-        - image:
-            src: casita_replying
+        - animimg:
+            id: replying_animimg
+            src:
+              - casita_replying
+            duration: 800ms
+            repeat_count: forever
+            auto_start: false
             x: 0
             y: 0
+            width: 320
+            height: 240
         - obj:
             x: 20
             y: 20
