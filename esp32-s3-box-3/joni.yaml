@@ -5,9 +5,7 @@ substitutions:
   idle_illustration_file: ../casita/idle.png
   listening_illustration_file: ../casita/listening.png
   thinking_illustration_file: ../casita/thinking.png
-  thinking_1_illustration_file: ../casita/thinking_1.png
   replying_illustration_file: ../casita/replying.png
-  replying_1_illustration_file: ../casita/replying_1.png
   error_illustration_file: ../casita/error.png
   timer_finished_illustration_file: ../casita/timer.png
   muted_illustration_file: ../casita/muted.png
@@ -695,16 +693,8 @@ image:
     id: casita_thinking
     type: RGB565
     transparency: alpha_channel
-  - file: ${thinking_1_illustration_file}
-    id: casita_thinking_1
-    type: RGB565
-    transparency: alpha_channel
   - file: ${replying_illustration_file}
     id: casita_replying
-    type: RGB565
-    transparency: alpha_channel
-  - file: ${replying_1_illustration_file}
-    id: casita_replying_1
     type: RGB565
     transparency: alpha_channel
   - file: ${timer_finished_illustration_file}
@@ -906,23 +896,11 @@ lvgl:
     - id: thinking_page
       bg_color: 0xFFFFFF
       bg_opa: COVER
-      on_load:
-        - lvgl.animimg.start: thinking_animimg
-      on_unload:
-        - lvgl.animimg.stop: thinking_animimg
       widgets:
-        - animimg:
-            id: thinking_animimg
-            src:
-              - casita_thinking
-              - casita_thinking_1
-            duration: 800ms
-            repeat_count: forever
-            auto_start: false
+        - image:
+            src: casita_thinking
             x: 0
             y: 0
-            width: 320
-            height: 240
         - obj:
             x: 20
             y: 20
@@ -960,23 +938,11 @@ lvgl:
     - id: replying_page
       bg_color: 0xFFFFFF
       bg_opa: COVER
-      on_load:
-        - lvgl.animimg.start: replying_animimg
-      on_unload:
-        - lvgl.animimg.stop: replying_animimg
       widgets:
-        - animimg:
-            id: replying_animimg
-            src:
-              - casita_replying
-              - casita_replying_1
-            duration: 800ms
-            repeat_count: forever
-            auto_start: false
+        - image:
+            src: casita_replying
             x: 0
             y: 0
-            width: 320
-            height: 240
         - obj:
             x: 20
             y: 20
