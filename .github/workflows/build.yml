@@ -100,7 +100,7 @@ jobs:
             mkdir -p "pages/${device}"
             if jq --exit-status --arg base "$base_url" '
               .builds |= map(
-                (.parts |= map(.path = ($base + "/" + (.path | ltrimstr("./")))))
+                (if has("parts") then .parts |= map(.path = ($base + "/" + (.path | ltrimstr("./")))) else . end)
                 | if has("ota") then .ota.path = ($base + "/" + (.ota.path | ltrimstr("./"))) else . end
               )
             ' "$manifest" > "pages/${device}/manifest.json"; then
