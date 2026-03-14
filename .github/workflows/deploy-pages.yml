@@ -72,7 +72,7 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
         with:
           path: files
-          run-id: ${{ steps.build-run.outputs.run-id }}
+          run-id: ${{ steps['build-run'].outputs['run-id'] }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Pages content
