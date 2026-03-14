@@ -1,16 +1,16 @@
 substitutions:
   name: joni
   friendly_name: Joni
-  loading_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
-  idle_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/idle_320_240.png
-  listening_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
-  thinking_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
-  thinking_1_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/thinking_1_320_240.png
-  replying_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/replying_320_240.png
-  replying_1_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/replying_1_320_240.png
-  error_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/error_320_240.png
-  timer_finished_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/timer_finished_320_240.png
-  muted_illustration_file: https://github.com/Joni-Lover/wake-word-voice-assistants/raw/main/casita/muted_320_240.png
+  loading_illustration_file: ../casita/loading_320_240.png
+  idle_illustration_file: ../casita/idle_320_240.png
+  listening_illustration_file: ../casita/listening_320_240.png
+  thinking_illustration_file: ../casita/thinking_320_240.png
+  thinking_1_illustration_file: ../casita/thinking_1_320_240.png
+  replying_illustration_file: ../casita/replying_320_240.png
+  replying_1_illustration_file: ../casita/replying_1_320_240.png
+  error_illustration_file: ../casita/error_320_240.png
+  timer_finished_illustration_file: ../casita/timer_finished_320_240.png
+  muted_illustration_file: ../casita/muted_320_240.png
 
   voice_assist_idle_phase_id: "1"
   voice_assist_listening_phase_id: "2"
