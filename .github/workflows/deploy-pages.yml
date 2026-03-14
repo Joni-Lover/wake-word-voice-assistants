@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   workflow_dispatch:
     inputs:
-      release-tag:
+      release_tag:
         description: >-
           Release tag to deploy (leave empty to use the latest
           non-prerelease release)
@@ -22,7 +22,6 @@ jobs:
       ESP_WEB_TOOLS_VERSION: "10.2.1"
       ESP_WEB_TOOLS_INTEGRITY: "sha384-2Ea4WL8tjFb0qQKUqBoX45KlPVoUgL+Z3zUqsD0MHmtJ3faDbfNyZulLg/LfYDUZ"
     permissions:
-      actions: read
       contents: read
       pages: write
       id-token: write
@@ -35,7 +34,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ inputs['release-tag'] }}"
+          tag="${{ inputs.release_tag }}"
           if [ -z "$tag" ]; then
             tag=$(gh api "/repos/${{ github.repository }}/releases" \
               --jq '[.[] | select(.prerelease==false and .draft==false)][0].tag_name')
@@ -46,34 +45,16 @@ jobs:
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Find successful build run for release
-        id: build-run
+      - name: Download Release Assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ steps.release.outputs.tag }}"
-          # Resolve the tag to its commit SHA to reliably match the workflow run
-          sha=$(gh api "/repos/${{ github.repository }}/commits/${tag}" --jq '.sha' || echo "")
-          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
-            echo "Failed to resolve commit SHA for tag ${tag}."
-            exit 1
-          fi
-          run_id=$(gh api "/repos/${{ github.repository }}/actions/workflows/build.yml/runs" \
-            -f event=release -f status=success \
-            --jq ".workflow_runs[] | select(.head_sha==\"${sha}\") | .id" \
-            | head -1)
-          if [ -z "$run_id" ]; then
-            echo "No successful build workflow run found for release ${tag} (sha ${sha})."
-            exit 1
-          fi
-          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
-        with:
-          path: files
-          run-id: ${{ steps['build-run'].outputs['run-id'] }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          mkdir -p release_assets
+          gh release download "${{ steps.release.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.manifest.json" \
+            --pattern "*.factory.bin" \
+            --dir release_assets
 
       - name: Create Pages content
         run: |
@@ -84,24 +65,17 @@ jobs:
           version="${{ steps.release.outputs.tag }}"
           repo="${{ github.repository }}"
           base_url="https://github.com/${repo}/releases/download/${version}"
-          device_dirs=(files/*/"$version"/)
+          manifests=(release_assets/*.manifest.json)
           processed_devices=0
 
-          if [ ${#device_dirs[@]} -eq 0 ]; then
-            echo "No device artifact directories found under files/*/${version}/"
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo "No manifest files found in release assets"
             exit 1
           fi
 
-          for version_dir in "${device_dirs[@]}"; do
-            device_dir=$(dirname "$version_dir")
-            device_raw=$(basename "$device_dir")
-            device="${device_raw%.factory}"
-            manifest="$version_dir/manifest.json"
-
-            if [ ! -f "$manifest" ]; then
-              echo "No manifest.json found for device directory: ${device_raw}"
-              exit 1
-            fi
+          for manifest in "${manifests[@]}"; do
+            asset_name=$(basename "$manifest")
+            device="${asset_name%.manifest.json}"
 
             mkdir -p "pages/${device}"
 
@@ -109,9 +83,9 @@ jobs:
             # Firmware hosted on GitHub Releases redirects via github.com to
             # objects.githubusercontent.com which may not include CORS headers,
             # causing "Failed to fetch" errors in esp-web-tools when installing.
-            bin_files=("${version_dir}"/*.bin)
+            bin_files=(release_assets/"${device}"-*.factory.bin)
             if [ ${#bin_files[@]} -eq 0 ]; then
-              echo "No .bin files found for device directory: ${device_raw}"
+              echo "No factory .bin files found for device ${device}"
               exit 1
             fi
             for bin_file in "${bin_files[@]}"; do
@@ -127,9 +101,9 @@ jobs:
                 | if has("ota") then .ota.path = ($base + "/" + (.ota.path | ltrimstr("./"))) else . end
               )
             ' "$manifest" > "pages/${device}/manifest.json"; then
-              echo "Processed manifest for ${device_raw} -> pages/${device}"
+              echo "Processed manifest for ${device}"
             else
-              echo "Failed to process manifest for ${device_raw} -> pages/${device}"
+              echo "Failed to process manifest for ${device}"
               rm -f "pages/${device}/manifest.json"
               exit 1
             fi
@@ -220,10 +194,9 @@ jobs:
               <ul>
           EOF
 
-          for version_dir in "${device_dirs[@]}"; do
-            device_dir=$(dirname "$version_dir")
-            device_raw=$(basename "$device_dir")
-            device="${device_raw%.factory}"
+          for manifest in "${manifests[@]}"; do
+            asset_name=$(basename "$manifest")
+            device="${asset_name%.manifest.json}"
 
             cat >> pages/index.html <<EOF
                 <li>
