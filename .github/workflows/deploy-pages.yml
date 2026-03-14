@@ -35,7 +35,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ inputs.release-tag }}"
+          tag="${{ inputs['release-tag'] }}"
           if [ -z "$tag" ]; then
             tag=$(gh api "/repos/${{ github.repository }}/releases" \
               --jq '[.[] | select(.prerelease==false and .draft==false)][0].tag_name')
