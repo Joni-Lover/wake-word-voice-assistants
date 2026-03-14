@@ -88,11 +88,12 @@ jobs:
 
           for version_dir in "${device_dirs[@]}"; do
             device_dir=$(dirname "$version_dir")
-            device=$(basename "$device_dir")
+            device_raw=$(basename "$device_dir")
+            device="${device_raw%.factory}"
             manifest="$version_dir/manifest.json"
 
             if [ ! -f "$manifest" ]; then
-              echo "No manifest.json found for device directory: ${device}"
+              echo "No manifest.json found for device directory: ${device_raw}"
               exit 1
             fi
 
@@ -103,9 +104,9 @@ jobs:
                 | if has("ota") then .ota.path = ($base + "/" + (.ota.path | ltrimstr("./"))) else . end
               )
             ' "$manifest" > "pages/${device}/manifest.json"; then
-              echo "Processed manifest for ${device}"
+              echo "Processed manifest for ${device_raw} -> pages/${device}"
             else
-              echo "Failed to process manifest for ${device}"
+              echo "Failed to process manifest for ${device_raw} -> pages/${device}"
               rm -f "pages/${device}/manifest.json"
               exit 1
             fi
