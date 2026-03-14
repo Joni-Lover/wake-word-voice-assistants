@@ -1,8 +1,8 @@
 ---
 packages:
   # This is an inline package to prefix the on_client_connected with the wait_until action
-  # It must appear before the actual package so it becomes the orignal config and the
-  # on_client_connected list from the package config is appends onto this one.
+  # It must appear before the actual package so it becomes the original config and the
+  # on_client_connected list from the package config is appended onto this one.
   va_connected_wait_for_ble:
     voice_assistant:
       on_client_connected:
