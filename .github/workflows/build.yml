@@ -18,10 +18,11 @@ jobs:
     uses: ./.github/workflows/build-firmware.yml
     with:
       files: |
-        esp32-s3-box/esp32-s3-box.factory.yaml
-        esp32-s3-box-lite/esp32-s3-box-lite.factory.yaml
         esp32-s3-box-3/esp32-s3-box-3.factory.yaml
         m5stack-atom-echo/m5stack-atom-echo.factory.yaml
+        # Disabled for now:
+        # esp32-s3-box/esp32-s3-box.factory.yaml
+        # esp32-s3-box-lite/esp32-s3-box-lite.factory.yaml
       esphome-version: 2026.2.4
       release-summary: ${{ github.event_name == 'release' && github.event.release.body || '' }}
       release-url: ${{ github.event_name == 'release' && github.event.release.html_url || '' }}
@@ -29,8 +30,8 @@ jobs:
 
   build-minimal-firmware:
     name: Build Atom Echo Minimal Firmware
+    if: false  # Disabled for now; keep job definition for future use.
     uses: ./.github/workflows/build-firmware.yml
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     with:
       files: |
         m5stack-atom-echo/m5stack-atom-echo.minimal.factory.yaml
