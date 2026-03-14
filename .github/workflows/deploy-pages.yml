@@ -52,12 +52,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${{ steps.release.outputs.tag }}"
+          # Resolve the tag to its commit SHA to reliably match the workflow run
+          sha=$(gh api "/repos/${{ github.repository }}/commits/${tag}" --jq '.sha' || echo "")
+          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
+            echo "Failed to resolve commit SHA for tag ${tag}."
+            exit 1
+          fi
           run_id=$(gh api "/repos/${{ github.repository }}/actions/workflows/build.yml/runs" \
             -f event=release -f status=success \
-            --jq ".workflow_runs[] | select(.head_branch==\"${tag}\") | .id" \
+            --jq ".workflow_runs[] | select(.head_sha==\"${sha}\") | .id" \
             | head -1)
           if [ -z "$run_id" ]; then
-            echo "No successful build workflow run found for release ${tag}."
+            echo "No successful build workflow run found for release ${tag} (sha ${sha})."
             exit 1
           fi
           echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
