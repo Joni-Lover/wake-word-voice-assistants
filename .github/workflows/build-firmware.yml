@@ -137,18 +137,22 @@ jobs:
       - name: Combine all parts into a single manifest
         run: |
           version="${{ needs.prepare.outputs.version }}"
+          shopt -s nullglob
           mkdir -p "output/$version"
-          pushd files
-          for device in *; do
-            pushd $device
-            pushd $version
-            cp * "../../../output/$version/"
-            popd
-            popd
+
+          manifests=(files/*/"$version"/manifest.json files/"$version"/manifest.json)
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo "No manifest files found under files/*/$version/ or files/$version/"
+            exit 1
+          fi
+
+          for manifest in "${manifests[@]}"; do
+            part_dir=$(dirname "$manifest")
+            cp "$part_dir"/* "output/$version/"
           done
-          popd
+
           jq -s '(.[0] | del(.builds)) + {"builds": (reduce .[].builds as $b ([]; . + $b))}' \
-            files/*/$version/manifest.json > output/$version/manifest.json
+            "${manifests[@]}" > output/$version/manifest.json
 
       - name: Upload artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
