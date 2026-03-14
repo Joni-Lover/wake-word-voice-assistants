@@ -112,6 +112,88 @@ jobs:
             fi
           done
 
+          cat > pages/index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Wake Word Voice Assistants Firmware</title>
+            <style>
+              :root {
+                color-scheme: light;
+                font-family: "Segoe UI", system-ui, sans-serif;
+                background: #f5f7fb;
+                color: #18212f;
+              }
+              body {
+                margin: 0;
+                min-height: 100vh;
+                background: linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
+              }
+              main {
+                max-width: 760px;
+                margin: 0 auto;
+                padding: 48px 20px 64px;
+              }
+              h1 {
+                margin: 0 0 12px;
+                font-size: clamp(2rem, 4vw, 3rem);
+              }
+              p {
+                line-height: 1.6;
+              }
+              ul {
+                padding: 0;
+                list-style: none;
+                display: grid;
+                gap: 12px;
+              }
+              li {
+                background: #ffffff;
+                border: 1px solid #d7e1ee;
+                border-radius: 14px;
+                padding: 16px 18px;
+                box-shadow: 0 8px 24px rgba(24, 33, 47, 0.06);
+              }
+              a {
+                color: #005fb8;
+                text-decoration: none;
+                font-weight: 600;
+              }
+              a:hover {
+                text-decoration: underline;
+              }
+              code {
+                font-family: Consolas, "Courier New", monospace;
+                font-size: 0.95em;
+              }
+            </style>
+          </head>
+          <body>
+            <main>
+              <h1>Wake Word Voice Assistants Firmware</h1>
+              <p>Release <code>${version}</code> for <code>${repo}</code>.</p>
+              <p>Available device manifests:</p>
+              <ul>
+          EOF
+
+          for version_dir in "${device_dirs[@]}"; do
+            device_dir=$(dirname "$version_dir")
+            device_raw=$(basename "$device_dir")
+            device="${device_raw%.factory}"
+            cat >> pages/index.html <<EOF
+                <li><a href="./${device}/manifest.json">${device}</a></li>
+          EOF
+          done
+
+          cat >> pages/index.html <<EOF
+              </ul>
+            </main>
+          </body>
+          </html>
+          EOF
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
