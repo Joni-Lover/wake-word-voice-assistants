@@ -1,64 +1,27 @@
-name: Build
+name: Deploy to GitHub Pages
 
 on:
-  pull_request:
   workflow_dispatch:
-  release:
-    types: [published]
-# schedule:
-#   - cron: '0 0 * * 0'
+    inputs:
+      release_tag:
+        description: >-
+          Release tag to deploy (leave empty to use the latest
+          non-prerelease release)
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: deploy-pages
   cancel-in-progress: true
 
 jobs:
-  build-firmware:
-    name: Build Firmware
-    uses: ./.github/workflows/build-firmware.yml
-    with:
-      files: |
-        esp32-s3-box-3/esp32-s3-box-3.factory.yaml
-        m5stack-atom-echo/m5stack-atom-echo.factory.yaml
-        # Disabled for now:
-        # esp32-s3-box/esp32-s3-box.factory.yaml
-        # esp32-s3-box-lite/esp32-s3-box-lite.factory.yaml
-      esphome-version: 2026.2.4
-      release-summary: ${{ github.event_name == 'release' && github.event.release.body || '' }}
-      release-url: ${{ github.event_name == 'release' && github.event.release.html_url || '' }}
-      release-version: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
-
-  build-minimal-firmware:
-    name: Build Atom Echo Minimal Firmware
-    if: false  # Disabled for now; keep job definition for future use.
-    uses: ./.github/workflows/build-firmware.yml
-    with:
-      files: |
-        m5stack-atom-echo/m5stack-atom-echo.minimal.factory.yaml
-      combined-name: m5stack-atom-echo-minimal
-      esphome-version: 2026.2.4
-      release-summary: ${{ github.event_name == 'release' && github.event.release.body || '' }}
-      release-url: ${{ github.event_name == 'release' && github.event.release.html_url || '' }}
-      release-version: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
-
-  upload-to-release:
-    name: Upload to Release
-    if: github.event_name == 'release'
-    uses: esphome/workflows/.github/workflows/upload-to-gh-release.yml@2025.8.1
-    needs:
-      - build-firmware
-    with:
-      version: ${{ github.event.release.tag_name }}
-
   deploy-pages:
     name: Deploy to GitHub Pages
-    if: github.event_name == 'release' && github.event.release.prerelease == false
-    needs:
-      - build-firmware
-      - upload-to-release
     runs-on: ubuntu-latest
+    env:
+      ESP_WEB_TOOLS_VERSION: "10.2.1"
+      ESP_WEB_TOOLS_INTEGRITY: "sha384-2Ea4WL8tjFb0qQKUqBoX45KlPVoUgL+Z3zUqsD0MHmtJ3faDbfNyZulLg/LfYDUZ"
     permissions:
-      actions: read
       contents: read
       pages: write
       id-token: write
@@ -66,10 +29,32 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
-        with:
-          path: files
+      - name: Resolve release tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.release_tag }}"
+          if [ -z "$tag" ]; then
+            tag=$(gh api "/repos/${{ github.repository }}/releases" \
+              --jq '[.[] | select(.prerelease==false and .draft==false)][0].tag_name')
+          fi
+          if [ -z "$tag" ] || [ "$tag" = "null" ]; then
+            echo "No non-prerelease release found."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download Release Assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release_assets
+          gh release download "${{ steps.release.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.manifest.json" \
+            --pattern "*.factory.bin" \
+            --dir release_assets
 
       - name: Create Pages content
         run: |
@@ -77,27 +62,20 @@ jobs:
           shopt -s nullglob
 
           mkdir -p pages
-          version="${{ github.event.release.tag_name }}"
+          version="${{ steps.release.outputs.tag }}"
           repo="${{ github.repository }}"
           base_url="https://github.com/${repo}/releases/download/${version}"
-          device_dirs=(files/*/"$version"/)
+          manifests=(release_assets/*.manifest.json)
           processed_devices=0
 
-          if [ ${#device_dirs[@]} -eq 0 ]; then
-            echo "No device artifact directories found under files/*/${version}/"
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo "No manifest files found in release assets"
             exit 1
           fi
 
-          for version_dir in "${device_dirs[@]}"; do
-            device_dir=$(dirname "$version_dir")
-            device_raw=$(basename "$device_dir")
-            device="${device_raw%.factory}"
-            manifest="$version_dir/manifest.json"
-
-            if [ ! -f "$manifest" ]; then
-              echo "No manifest.json found for device directory: ${device_raw}"
-              exit 1
-            fi
+          for manifest in "${manifests[@]}"; do
+            asset_name=$(basename "$manifest")
+            device="${asset_name%.manifest.json}"
 
             mkdir -p "pages/${device}"
 
@@ -105,9 +83,9 @@ jobs:
             # Firmware hosted on GitHub Releases redirects via github.com to
             # objects.githubusercontent.com which may not include CORS headers,
             # causing "Failed to fetch" errors in esp-web-tools when installing.
-            bin_files=("${version_dir}"/*.bin)
+            bin_files=(release_assets/"${device}"-*.factory.bin)
             if [ ${#bin_files[@]} -eq 0 ]; then
-              echo "No .bin files found for device directory: ${device_raw}"
+              echo "No factory .bin files found for device ${device}"
               exit 1
             fi
             for bin_file in "${bin_files[@]}"; do
@@ -123,9 +101,9 @@ jobs:
                 | if has("ota") then .ota.path = ($base + "/" + (.ota.path | ltrimstr("./"))) else . end
               )
             ' "$manifest" > "pages/${device}/manifest.json"; then
-              echo "Processed manifest for ${device_raw} -> pages/${device}"
+              echo "Processed manifest for ${device}"
             else
-              echo "Failed to process manifest for ${device_raw} -> pages/${device}"
+              echo "Failed to process manifest for ${device}"
               rm -f "pages/${device}/manifest.json"
               exit 1
             fi
@@ -145,7 +123,7 @@ jobs:
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Wake Word Voice Assistants Firmware</title>
-            <script type="module" src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module" integrity="sha384-2Ea4WL8tjFb0qQKUqBoX45KlPVoUgL+Z3zUqsD0MHmtJ3faDbfNyZulLg/LfYDUZ" crossorigin="anonymous"></script>
+            <script type="module" src="https://unpkg.com/esp-web-tools@${ESP_WEB_TOOLS_VERSION}/dist/web/install-button.js?module" integrity="${ESP_WEB_TOOLS_INTEGRITY}" crossorigin="anonymous"></script>
             <style>
               :root {
                 color-scheme: light;
@@ -216,10 +194,9 @@ jobs:
               <ul>
           EOF
 
-          for version_dir in "${device_dirs[@]}"; do
-            device_dir=$(dirname "$version_dir")
-            device_raw=$(basename "$device_dir")
-            device="${device_raw%.factory}"
+          for manifest in "${manifests[@]}"; do
+            asset_name=$(basename "$manifest")
+            device="${asset_name%.manifest.json}"
 
             cat >> pages/index.html <<EOF
                 <li>
@@ -238,10 +215,10 @@ jobs:
           EOF
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3
         with:
           path: pages/
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4
