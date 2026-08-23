@@ -179,7 +179,7 @@ Locks PRs after **1 day** of inactivity and issues after **1 day**. PRs/issues l
 2. **Edit `<device>.factory.yaml`** only for release-specific settings (update manifest URL, dashboard import URL, project metadata).
 3. Keep substitution variables at the top of the YAML for all configurable values (illustration URLs, colour codes, phase IDs).
 4. Use `packages:` for code reuse rather than duplicating YAML between devices.
-5. The `min_version` field must be updated when using new ESPHome features; currently set to `2025.5.0`.
+5. The `min_version` field must be updated when using new ESPHome features; currently set to `2026.4.0`.
 
 ### YAML Style Rules (`.yamllint`)
 
