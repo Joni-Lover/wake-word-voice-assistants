@@ -5,7 +5,7 @@ This repo holds the source of various firmwares used for installing ESPHome onto
 ## Local Build, Flash, and Debug
 
 1. Install ESPHome matching CI:
-   `pip install esphome==2026.5.3`
+   `pip install esphome==2026.9.1`
 
 2. Validate the main config locally:
    `esphome compile esp32-s3-box-3/joni.yaml`
