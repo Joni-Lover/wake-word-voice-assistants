@@ -39,7 +39,7 @@ Each device folder contains:
 │   │   ├── build-minimal.yml    # Minimal Atom Echo build (all jobs disabled with `if: false`; kept for future use)
 │   │   ├── yaml-lint.yml        # Strict YAML linting (yamllint)
 │   │   ├── stale.yml            # Auto-close stale issues after 30 + 5 days
-│   │   └── lock.yml             # Auto-lock inactive PRs/issues after 1 day
+│   │   └── lock.yml             # Auto-lock closed PRs/issues after 1 day
 │   └── dependabot.yml       # Weekly GitHub Actions dependency updates
 ├── casita/                  # 320×240 PNG illustrations for the S3-Box LCD
 ├── error_box_illustrations/ # Error-state illustrations
@@ -167,7 +167,7 @@ Marks issues stale after **30 days** of inactivity; closes them after **5 more d
 
 ### `lock.yml`
 
-Locks PRs after **1 day** of inactivity and issues after **1 day**. PRs/issues labelled `keep-open` are exempt. Runs daily at 19:00 UTC.
+Locks closed PRs and issues after **1 day**. Runs daily at 19:00 UTC.
 
 ---
 
