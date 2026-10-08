@@ -31,7 +31,7 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2025.5.0
+  min_version: 2026.4.0
   name_add_mac_suffix: true
   on_boot:
     priority: 600
@@ -229,9 +229,12 @@ media_player:
 micro_wake_word:
   id: mww
   models:
-    - okay_nabu
-    - hey_mycroft
-    - hey_jarvis
+    - model: okay_nabu
+      id: okay_nabu
+    - model: hey_mycroft
+      id: hey_mycroft
+    - model: hey_jarvis
+      id: hey_jarvis
   on_wake_word_detected:
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
@@ -819,7 +822,7 @@ spi:
     mosi_pin: 6
 
 display:
-  - platform: ili9xxx
+  - platform: mipi_spi
     id: s3_box_lcd
     model: S3BOX
     invert_colors: false
